@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -131,4 +132,39 @@ public class CompensacionService {
                 .fechaGeneracion(entity.getFechaGeneracion())
                 .build();
     }
+
+    @Transactional
+    public void acumularMovimiento(Integer cicloId, String bic, BigDecimal monto, boolean esDebito) {
+        log.info("Acumulando {} para BIC: {}", monto, bic);
+
+        // 1. Buscamos la posición existente O creamos una nueva en ceros
+        PosicionInstitucion posicion = posicionRepository.findByCicloId(cicloId).stream()
+                .filter(p -> p.getCodigoBic().equals(bic))
+                .findFirst()
+                .orElseGet(() -> {
+                    // Si no existe, la creamos al vuelo
+                    CicloCompensacion ciclo = cicloRepository.findById(cicloId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Ciclo no encontrado"));
+                    PosicionInstitucion nueva = new PosicionInstitucion();
+                    nueva.setCiclo(ciclo);
+                    nueva.setCodigoBic(bic);
+                    nueva.setTotalDebitos(BigDecimal.ZERO);
+                    nueva.setTotalCreditos(BigDecimal.ZERO);
+                    nueva.setNeto(BigDecimal.ZERO);
+                    return nueva;
+                });
+
+        // 2. Acumulamos matemáticas (BigDecimal es inmutable, ojo)
+        if (esDebito) {
+            posicion.setTotalDebitos(posicion.getTotalDebitos().add(monto));
+        } else {
+            posicion.setTotalCreditos(posicion.getTotalCreditos().add(monto));
+        }
+
+        // 3. Recalculamos el Neto (Créditos - Débitos)
+        posicion.setNeto(posicion.getTotalCreditos().subtract(posicion.getTotalDebitos()));
+
+        posicionRepository.save(posicion);
+    }
+
 }

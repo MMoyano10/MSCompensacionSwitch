@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -59,6 +60,20 @@ public class CompensacionController {
     public ResponseEntity<ArchivoDTO> registrarArchivo(@Valid @RequestBody ArchivoDTO dto) {
         return new ResponseEntity<>(service.registrarArchivo(dto), HttpStatus.CREATED);
     }
+
+    @PostMapping("/ciclos/{cicloId}/acumular")
+    @Operation(summary = "INTERNAL: Acumular movimiento (Usado por Nucleo)",
+            description = "Suma un monto a los débitos o créditos de un banco en tiempo real.")
+    public ResponseEntity<Void> acumular(
+            @PathVariable Integer cicloId,
+            @RequestParam String bic,
+            @RequestParam BigDecimal monto,
+            @RequestParam boolean esDebito) {
+
+        service.acumularMovimiento(cicloId, bic, monto, esDebito);
+        return ResponseEntity.ok().build();
+    }
+
 
     @GetMapping("/ciclos/{cicloId}/archivos")
     @Operation(summary = "Listar archivos por ciclo", description = "Obtiene todos los archivos de liquidación generados para un ciclo")

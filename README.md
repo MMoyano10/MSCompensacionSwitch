@@ -53,8 +53,8 @@ Dentro de la arquitectura del Switch, este microservicio actúa en la fase **Pos
    docker-compose up --build
    ```
 3. **Acceder a la documentación:**
-   - Swagger UI: [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html)
-   - API Docs: [http://localhost:8081/v3/api-docs](http://localhost:8081/v3/api-docs)
+   - Swagger UI: [http://localhost:8084/swagger-ui.html](http://localhost:8081/swagger-ui.html)
+   - API Docs: [http://localhost:8084/v3/api-docs](http://localhost:8081/v3/api-docs)
 
 ---
 
