@@ -80,4 +80,11 @@ public class CompensacionController {
     public ResponseEntity<List<ArchivoDTO>> listarArchivos(@PathVariable Integer cicloId) {
         return ResponseEntity.ok(service.listarArchivosPorCiclo(cicloId));
     }
+
+    @PostMapping("/ciclos/{cicloId}/cierre")
+    @Operation(summary = "EJECUTAR CIERRE DIARIO", description = "Verifica suma cero, genera archivo XML y cierra el ciclo.")
+    public ResponseEntity<ArchivoDTO> cerrarCiclo(@PathVariable Integer cicloId) {
+        return ResponseEntity.ok(service.realizarCierreDiario(cicloId));
+    }
+    
 }
