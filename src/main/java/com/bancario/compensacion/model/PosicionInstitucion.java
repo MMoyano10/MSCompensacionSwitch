@@ -1,79 +1,48 @@
 package com.bancario.compensacion.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.math.BigDecimal;
-import java.util.Objects;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
-@Table(name = "PosicionInstitucion")
+@Table(name = "posicioninstitucion")
 @Getter
 @Setter
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "ciclo"})
 public class PosicionInstitucion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
     private Integer id;
 
-    @NotNull(message = "El ciclo de compensación es obligatorio")
+    @Column(name = "id_ciclo", insertable = false, updatable = false)
+    private Integer idCiclo;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "idCiclo", nullable = false)
+    @JoinColumn(name = "id_ciclo")
     private CicloCompensacion ciclo;
 
-    @NotBlank(message = "El código BIC es obligatorio")
-    @Size(max = 20)
-    @Column(name = "codigoBic", nullable = false, length = 20)
+    @Column(name = "codigo_bic", length = 20)
     private String codigoBic;
 
-    @Column(name = "totalDebitos", precision = 18, scale = 2)
-    private BigDecimal totalDebitos;
+    // --- REQUISITO CONTINUIDAD ---
+    @Column(name = "saldo_inicial", precision = 20, scale = 2)
+    private BigDecimal saldoInicial = BigDecimal.ZERO;
 
-    @Column(name = "totalCreditos", precision = 18, scale = 2)
-    private BigDecimal totalCreditos;
+    // --- REQUISITO NETEO MULTILATERAL ---
+    @Column(name = "total_debitos", precision = 20, scale = 2)
+    private BigDecimal totalDebitos = BigDecimal.ZERO; 
 
-    @Column(name = "neto", precision = 18, scale = 2)
-    private BigDecimal neto;
+    @Column(name = "total_creditos", precision = 20, scale = 2)
+    private BigDecimal totalCreditos = BigDecimal.ZERO; 
 
-    public PosicionInstitucion() {
-    }
+    @Column(name = "neto", precision = 20, scale = 2)
+    private BigDecimal neto = BigDecimal.ZERO;
 
-    public PosicionInstitucion(Integer id) {
-        this.id = id;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        PosicionInstitucion that = (PosicionInstitucion) o;
-        return Objects.equals(id, that.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
-    }
-
-    @Override
-    public String toString() {
-        return "PosicionInstitucion{" +
-                "id=" + id +
-                ", idCiclo=" + (ciclo != null ? ciclo.getId() : null) +
-                ", codigoBic='" + codigoBic + '\'' +
-                ", totalDebitos=" + totalDebitos +
-                ", totalCreditos=" + totalCreditos +
-                ", neto=" + neto +
-                '}';
+    public void recalcularNeto() {
+        
+        this.neto = this.saldoInicial.add(this.totalCreditos).subtract(this.totalDebitos);
     }
 }
