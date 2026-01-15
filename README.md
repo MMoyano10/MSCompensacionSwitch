@@ -1,89 +1,103 @@
-# Microservicio de Compensación 🏦
+# Microservicio de Compensación y Liquidación (Settlement Engine)
 
-## 📌 Descripción General
-El **Microservicio de Compensación** es un componente crítico del **Switch Transaccional**. Su función principal es gestionar el proceso de "Settlement" o liquidación neta entre las instituciones financieras participantes del sistema. 
+## Módulo G4: Implementación de Clearing, Continuidad Contable, Firma Digital y Monitoreo Operativo.
 
-A diferencia de la transacción en tiempo real (que ocurre en el Core del Switch), este microservicio se encarga de consolidar los movimientos, calcular posiciones deudoras/acreedoras y generar los archivos normativos para el Banco Central o entidad regulatoria.
+## 📌 Visión General
+Este microservicio es el Motor de Cierre del Switch Transaccional. Su responsabilidad no es solo acumular sumas, sino actuar como el Garante de la Integridad Financiera del ecosistema.
 
----
-
-## 🏗️ Papel en el Switch Transaccional
-Dentro de la arquitectura del Switch, este microservicio actúa en la fase **Post-Procesamiento**:
-
-1.  **Corte de Ciclo:** Permite definir ventanas de tiempo (diarias, por turnos, etc.) para agrupar transacciones.
-2.  **Cálculo de Posición Neta:** Determina cuánto dinero debe enviar o recibir cada institución (BIC) basándose en los débitos y créditos acumulados.
-3.  **Gestión de Archivos:** Genera y registra los archivos de liquidación (ej. XML, planos) que se envían a la cámara de compensación.
-4.  **Auditoría y Estado:** Mantiene la trazabilidad del estado de la liquidación (ABIERTO, CERRADO, ENVIADO).
+Implementa un modelo de **Neteo Multilateral con Continuidad**, lo que significa que el sistema opera como un libro mayor ininterrumpido donde los saldos finales de un ciclo se convierten automáticamente en los saldos iniciales del siguiente, garantizando trazabilidad forense completa.
 
 ---
 
-## 🛠️ Tecnologías Utilizadas
-- **Java 21** & **Spring Boot 3.5.x**
-- **Spring Data JPA:** Persistencia con PostgreSQL.
-- **Hibernate Validator:** Validaciones de integridad bancaria.
-- **OpenAPI 3 / Swagger:** Documentación interactiva de la API.
-- **Lombok:** Reducción de código boilerplate para logs y DTOs.
-- **Docker & Docker Compose:** Contenerización y orquestación.
+## ⚙️ Capacidades Clave (Cumplimiento RF)
+
+### 1. Neteo Multilateral (RF-05)
+Implementa el algoritmo de **Suma Cero**.
+- Acumula débitos y créditos en tiempo real.
+- Al cierre, valida matemáticamente que: `Σ (Posiciones Netas) == 0.00`.
+- Si el sistema no cuadra al centavo, bloquea la generación de archivos (Fail-Safe).
+
+### 2. Continuidad Contable (Requisito G4)
+A diferencia de un sistema batch tradicional que "resetea" a cero:
+- **Arrastre de Saldos:** Al cerrar el Ciclo N, el sistema crea atómicamente el Ciclo N+1.
+- **Trazabilidad:** El Saldo Final de hoy se inyecta como Saldo Inicial de mañana.
+
+### 3. Firma Digital JWS (RNF-SEC-04)
+Para garantizar la **Validez Legal** y el **No Repudio** de los archivos de liquidación:
+- Genera archivos XML compatibles con ISO 20022.
+- Firma criptográficamente el contenido usando el estándar JWS (JSON Web Signature) con algoritmo RS256.
+- Utiliza la librería certificada `nimbus-jose-jwt`.
+
+### 4. Monitor Operativo (Dashboard)
+Expone métricas en tiempo real para el tablero de control:
+- Semáforo de estado del sistema (Verde/Rojo).
+- Cronómetro de ciclos y volúmenes transaccionales.
 
 ---
 
-## 📂 Estructura del Proyecto
-- `model`: Entidades JPA con mappers manuales y lógica de integridad.
-- `dto`: Objetos de transferencia de datos validados y documentados.
-- `repository`: Interfaces de acceso a datos.
-- `service`: Lógica de negocio centralizada (sin interfaces Impl para mayor agilidad).
-- `controller`: Endpoints REST bajo estándar bancario.
-- `exception`: Manejo global de errores y respuestas estandarizadas.
+## 🛠️ Stack Tecnológico
+- **Core:** Java 21, Spring Boot 3.x
+- **Persistencia:** PostgreSQL (Esquema relacional estricto).
+- **Seguridad:** nimbus-jose-jwt (Criptografía asimétrica RSA).
+- **Documentación:** OpenAPI 3 / Swagger.
+- **Integración:** RESTful APIs (Nivel 2 Maturity Model).
 
 ---
 
-## 🚀 Instalación y Ejecución
+## 🔌 API Reference (V1)
 
-### Requisitos Previos
-- Docker y Docker Compose
-- Maven (o usar el `./mvnw` incluido)
+### 🟢 Dashboard & Monitoreo
+Endpoints públicos para alimentar el Frontend de control.
 
-### Pasos para Ejecutar
-1. **Construir el proyecto:**
-   ```powershell
-   ./mvnw clean package -DskipTests
-   ```
-2. **Levantar contenedores:**
-   ```powershell
-   docker-compose up --build
-   ```
-3. **Acceder a la documentación:**
-   - Swagger UI: [http://localhost:8084/swagger-ui.html](http://localhost:8081/swagger-ui.html)
-   - API Docs: [http://localhost:8084/v3/api-docs](http://localhost:8081/v3/api-docs)
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/dashboard/monitor` | Devuelve el estado del semáforo (V/R), ciclo activo y hora de inicio. |
+| `GET` | `/api/v1/compensacion/ciclos` | Historial completo de ciclos operativos (Auditoría). |
 
----
+### ⚡ Operaciones Core (Uso Interno del Switch)
+Endpoints de alta velocidad y seguridad para el motor transaccional.
 
-## 🔌 API Endpoints (V1)
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/api/v1/compensacion/ciclos/{id}/acumular` | **Clearing Real-Time:** Registra débitos/créditos. Invocado por MS-Nucleo. |
+| `POST` | `/api/v1/compensacion/ciclos/{id}/cierre` | **Settlement Trigger:** Ejecuta validación suma cero, firma JWS y continuidad. |
 
-### Ciclos de Compensación
-- `GET /api/v1/compensacion/ciclos`: Lista todos los ciclos.
-- `POST /api/v1/compensacion/ciclos`: Crea un nuevo ciclo de corte.
-- `GET /api/v1/compensacion/ciclos/{id}`: Detalle de un ciclo específico.
-
-### Posiciones Netas
-- `POST /api/v1/compensacion/posiciones`: Registra la posición de una institución.
-- `GET /api/v1/compensacion/ciclos/{cicloId}/posiciones`: Consulta posiciones de un ciclo.
-
-### Archivos de Liquidación
-- `POST /api/v1/compensacion/archivos`: Registra la generación de un archivo.
-- `GET /api/v1/compensacion/ciclos/{cicloId}/archivos`: Lista archivos generados por ciclo.
+> **Nota:** Se eliminaron los endpoints de creación manual (`POST /posiciones`) para garantizar la integridad de los datos. Las posiciones solo se crean por acumulación o continuidad automática.
 
 ---
 
-## 🔐 Configuración de Seguridad y DB
-El microservicio utiliza variables de entorno para su configuración dinámica (ver `docker-compose.yml`):
-- `SPRING_DATASOURCE_URL`: Conexión de base de datos.
-- `SPRING_DATASOURCE_PASSWORD`: Credencial configurada como `admin`.
+## 🔐 Seguridad y Firmas
+El servicio implementa un **Módulo de Seguridad (HSM Simulado)** en la clase `SeguridadService.java`.
+- **Algoritmo:** RS256 (RSA Signature with SHA-256).
+- **Key Rotation:** Preparado para inyección de llaves privadas vía variables de entorno o Vault.
 
 ---
 
-## 🤝 Unión con otros Microservicios
-Este microservicio suele comunicarse de forma asíncrona o mediante procesos Batch con el **Microservicio Core** del Switch:
-1. El Core notifica el fin de una transacción exitosa.
-2. El Microservicio de Compensación acumula estos datos en su tabla de `PosicionInstitucion` bajo un `CicloCompensacion` activo.
-3. Al finalizar el día, se cierra el ciclo y se activan los procesos de generación de archivos.
+## 🚀 Despliegue
+
+### Requisitos de Base de Datos
+El servicio requiere un esquema específico para manejar la continuidad. Asegúrese de ejecutar el script de inicialización (`init.sql`) que crea las tablas:
+- `ciclocompensacion`
+- `posicioninstitucion` (con columnas `saldo_inicial`, `neto`)
+- `archivoliquidacion` (con columna `firma_jws`)
+
+### Ejecución con Docker
+
+```bash
+# Construir imagen
+./mvnw clean package -DskipTests
+docker-compose build ms-compensacion
+
+# Levantar servicio
+docker-compose up -d ms-compensacion
+```
+
+---
+
+## 🧪 Pruebas de Validación (Defensa)
+1. **Integridad:** Realizar transacciones cruzadas y verificar que la suma de la columna `neto` en `posicioninstitucion` sea `0.00`.
+2. **Cierre:** Ejecutar `POST .../cierre`. Verificar que:
+   - El ciclo actual pasa a **CERRADO**.
+   - Se crea un nuevo ciclo **ABIERTO** automáticamente.
+   - Los saldos se arrastran a la columna `saldo_inicial` del nuevo ciclo.
+3. **Evidencia:** Descargar el XML generado y verificar el tag `<Signature>` o la estructura JWS en el log.
