@@ -1,103 +1,93 @@
-# Microservicio de Compensación y Liquidación (Settlement Engine)
+# 🏦 Microservicio de Compensación y Liquidación (Settlement G4)
 
-## Módulo G4: Implementación de Clearing, Continuidad Contable, Firma Digital y Monitoreo Operativo.
+### Módulo G4: Motor de Clearing Automatizado, Continuidad Contable y Monitor Operativo.
 
-## 📌 Visión General
-Este microservicio es el Motor de Cierre del Switch Transaccional. Su responsabilidad no es solo acumular sumas, sino actuar como el Garante de la Integridad Financiera del ecosistema.
+## 📌 Descripción General
+El Microservicio de Compensación actúa como la autoridad contable del Switch Transaccional. Su función es gestionar el ciclo de vida de la liquidación de fondos (Settlement) entre las instituciones participantes.
 
-Implementa un modelo de **Neteo Multilateral con Continuidad**, lo que significa que el sistema opera como un libro mayor ininterrumpido donde los saldos finales de un ciclo se convierten automáticamente en los saldos iniciales del siguiente, garantizando trazabilidad forense completa.
+A diferencia de los sistemas batch tradicionales, este microservicio implementa un Motor de Continuidad en Tiempo Real, diseñado para operar en ventanas de tiempo configurables (minutos/segundos) garantizando que el cierre de un ciclo provoque atómicamente la apertura del siguiente, manteniendo la integridad de los saldos.
 
----
+## 🚀 Características Clave (Implementación G4)
 
-## ⚙️ Capacidades Clave (Cumplimiento RF)
+### 1. ⏱️ Automatización de Ciclos (Scheduler)
+El sistema ya no depende de una ejecución manual.
+- **Auto-Arranque:** Al iniciar el sistema, si no existen datos, el DataInitializer crea automáticamente el Ciclo #1.
+- **Cierre por Tiempo:** Un cronómetro interno monitorea la antigüedad del ciclo abierto. Si supera el umbral configurado (defecto: 5 minutos), ejecuta el cierre automáticamente.
 
-### 1. Neteo Multilateral (RF-05)
-Implementa el algoritmo de **Suma Cero**.
-- Acumula débitos y créditos en tiempo real.
-- Al cierre, valida matemáticamente que: `Σ (Posiciones Netas) == 0.00`.
-- Si el sistema no cuadra al centavo, bloquea la generación de archivos (Fail-Safe).
+### 2. 🔄 Continuidad Contable (Rolling Balances)
+Implementación del principio de "Libro Mayor Continuo".
+- Al cerrar el Ciclo N, el sistema calcula los saldos netos.
+- Inmediatamente abre el Ciclo N+1.
+- **Arrastre de Saldos:** El saldo final del ciclo anterior se inyecta como Saldo Inicial del nuevo ciclo. Esto garantiza trazabilidad ininterrumpida.
 
-### 2. Continuidad Contable (Requisito G4)
-A diferencia de un sistema batch tradicional que "resetea" a cero:
-- **Arrastre de Saldos:** Al cerrar el Ciclo N, el sistema crea atómicamente el Ciclo N+1.
-- **Trazabilidad:** El Saldo Final de hoy se inyecta como Saldo Inicial de mañana.
+### 3. 🔐 Firma Digital JWS (Validez Legal)
+Cumplimiento del requisito RNF-SEC-04.
+- Los archivos de liquidación (XML ISO 20022) se firman criptográficamente.
+- Se utiliza el estándar JWS (JSON Web Signature) con algoritmo RS256 mediante la librería nimbus-jose-jwt.
 
-### 3. Firma Digital JWS (RNF-SEC-04)
-Para garantizar la **Validez Legal** y el **No Repudio** de los archivos de liquidación:
-- Genera archivos XML compatibles con ISO 20022.
-- Firma criptográficamente el contenido usando el estándar JWS (JSON Web Signature) con algoritmo RS256.
-- Utiliza la librería certificada `nimbus-jose-jwt`.
+### 4. 📊 Dashboard Monitor
+Exposición de métricas en tiempo real para el tablero de control operativo:
+- Estado del Semáforo (Verde/Rojo).
+- Identificación del Ciclo Activo.
+- Hora de inicio para cálculo de SLA.
 
-### 4. Monitor Operativo (Dashboard)
-Expone métricas en tiempo real para el tablero de control:
-- Semáforo de estado del sistema (Verde/Rojo).
-- Cronómetro de ciclos y volúmenes transaccionales.
-
----
-
-## 🛠️ Stack Tecnológico
-- **Core:** Java 21, Spring Boot 3.x
-- **Persistencia:** PostgreSQL (Esquema relacional estricto).
-- **Seguridad:** nimbus-jose-jwt (Criptografía asimétrica RSA).
-- **Documentación:** OpenAPI 3 / Swagger.
-- **Integración:** RESTful APIs (Nivel 2 Maturity Model).
-
----
+## 🛠️ Tecnologías
+- **Java 21 & Spring Boot 3.x**
+- **Spring Scheduler:** Automatización de tareas.
+- **PostgreSQL:** Persistencia relacional estricta.
+- **Nimbus JOSE+JWT:** Criptografía y firmas digitales.
+- **Lombok & Swagger:** Reducción de código y documentación.
 
 ## 🔌 API Reference (V1)
 
 ### 🟢 Dashboard & Monitoreo
-Endpoints públicos para alimentar el Frontend de control.
+Endpoints públicos para el Frontend de control.
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| `GET` | `/api/v1/dashboard/monitor` | Devuelve el estado del semáforo (V/R), ciclo activo y hora de inicio. |
-| `GET` | `/api/v1/compensacion/ciclos` | Historial completo de ciclos operativos (Auditoría). |
+| GET | `/api/v1/dashboard/monitor` | Semáforo: Retorna estado (OPERATIVO/CERRADO), color (VERDE/ROJO) y ciclo activo. |
+| GET | `/api/v1/compensacion/ciclos` | Historial completo de ciclos operativos. |
+| GET | `/api/v1/compensacion/ciclos/{id}/posiciones` | Detalle de saldos netos por banco en un ciclo específico. |
 
-### ⚡ Operaciones Core (Uso Interno del Switch)
-Endpoints de alta velocidad y seguridad para el motor transaccional.
+### ⚡ Operaciones Core (Switch Interno)
+Endpoints utilizados por el MS-Nucleo para registrar movimientos.
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| `POST` | `/api/v1/compensacion/ciclos/{id}/acumular` | **Clearing Real-Time:** Registra débitos/créditos. Invocado por MS-Nucleo. |
-| `POST` | `/api/v1/compensacion/ciclos/{id}/cierre` | **Settlement Trigger:** Ejecuta validación suma cero, firma JWS y continuidad. |
+| POST | `/api/v1/compensacion/acumular` | **Auto-Detect:** Registra un débito/crédito en el ciclo ABIERTO actual automáticamente. |
+| POST | `/api/v1/compensacion/ciclos/{id}/cierre` | **Settlement Trigger:** Fuerza el cierre, firma el XML y activa la continuidad. (Usado por el Scheduler). |
 
-> **Nota:** Se eliminaron los endpoints de creación manual (`POST /posiciones`) para garantizar la integridad de los datos. Las posiciones solo se crean por acumulación o continuidad automática.
+## ⚙️ Configuración y Ejecución
 
----
+### Requisitos Previos
+- Docker y Docker Compose instalados.
+- Puerto 8084 disponible (por defecto).
 
-## 🔐 Seguridad y Firmas
-El servicio implementa un **Módulo de Seguridad (HSM Simulado)** en la clase `SeguridadService.java`.
-- **Algoritmo:** RS256 (RSA Signature with SHA-256).
-- **Key Rotation:** Preparado para inyección de llaves privadas vía variables de entorno o Vault.
+### Pasos de Despliegue
 
----
+#### Limpieza (Recomendado para ver la Inicialización):
+Si desea ver el Ciclo 1 crearse solo, limpie la base de datos antes de iniciar.
 
-## 🚀 Despliegue
-
-### Requisitos de Base de Datos
-El servicio requiere un esquema específico para manejar la continuidad. Asegúrese de ejecutar el script de inicialización (`init.sql`) que crea las tablas:
-- `ciclocompensacion`
-- `posicioninstitucion` (con columnas `saldo_inicial`, `neto`)
-- `archivoliquidacion` (con columna `firma_jws`)
-
-### Ejecución con Docker
-
+#### Construcción y Arranque:
 ```bash
-# Construir imagen
 ./mvnw clean package -DskipTests
-docker-compose build ms-compensacion
-
-# Levantar servicio
-docker-compose up -d ms-compensacion
+docker-compose up -d --build ms-compensacion
 ```
 
----
+#### Verificación:
+Revise los logs para confirmar la firma JWS y la creación de ciclos:
+```bash
+docker logs -f ms-compensacion
+```
+**Salida esperada:** `>>> INICIALIZADOR: Ciclo 1 Creado Automáticamente.`
 
-## 🧪 Pruebas de Validación (Defensa)
-1. **Integridad:** Realizar transacciones cruzadas y verificar que la suma de la columna `neto` en `posicioninstitucion` sea `0.00`.
-2. **Cierre:** Ejecutar `POST .../cierre`. Verificar que:
-   - El ciclo actual pasa a **CERRADO**.
-   - Se crea un nuevo ciclo **ABIERTO** automáticamente.
-   - Los saldos se arrastran a la columna `saldo_inicial` del nuevo ciclo.
-3. **Evidencia:** Descargar el XML generado y verificar el tag `<Signature>` o la estructura JWS en el log.
+## 🧪 Escenario de Prueba (Demo)
+1. **Inicio:** El sistema levanta y crea el Ciclo 1.
+2. **Operación:** Se envían transacciones desde el Switch (`/acumular`).
+3. **Corte Automático:** Al pasar 5 minutos, el Scheduler:
+   - Valida suma cero.
+   - Genera el XML firmado.
+   - Cierra el Ciclo 1.
+   - Abre el Ciclo 2 arrastrando los saldos netos.
+4. **Resultado:** El Dashboard muestra inmediatamente "Ciclo 2" y el semáforo en VERDE.
+
