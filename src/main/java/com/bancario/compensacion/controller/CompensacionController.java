@@ -17,6 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/compensacion")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*") 
 @Tag(name = "Microservicio de Compensación (G4)", description = "Gestión de Clearing, Settlement y Continuidad")
 public class CompensacionController {
 
